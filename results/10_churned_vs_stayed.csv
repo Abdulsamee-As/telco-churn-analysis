@@ -1,0 +1,3 @@
+customer_status,customers,avg_tenure_months,avg_monthly_charges,avg_total_charges
+Churned,1869,18.0,74.44,1531.8
+Stayed,5174,37.6,61.27,2549.91
