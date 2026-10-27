@@ -1,0 +1,123 @@
+// =====================================================================
+// Telco Customer Churn: Power BI calculated columns and measures
+// Tables: accounts, customers, services (joined 1:1 on customer_id)
+// =====================================================================
+
+
+// ---------------------------------------------------------------------
+// CALCULATED COLUMNS (Table view > select table > New column)
+// ---------------------------------------------------------------------
+
+// accounts table: same churn risk score as views/customer_risk.sql
+Risk Score =
+VAR contractPoints =
+    SWITCH ( accounts[contract], "Month-to-month", 3, "One year", 1, 0 )
+VAR tenurePoints =
+    IF ( accounts[tenure_months] <= 12, 2, IF ( accounts[tenure_months] <= 24, 1, 0 ) )
+VAR paymentPoints =
+    IF ( accounts[payment_method] = "Electronic check", 2, 0 )
+VAR internet = RELATED ( services[internet_service] )
+VAR fiberPoints =
+    IF ( internet = "Fiber optic", 2, 0 )
+VAR supportPoints =
+    IF ( internet <> "No" && RELATED ( services[tech_support] ) = "No", 1, 0 )
+VAR securityPoints =
+    IF ( internet <> "No" && RELATED ( services[online_security] ) = "No", 1, 0 )
+VAR seniorPoints =
+    IF ( RELATED ( customers[senior_citizen] ) = "Yes", 1, 0 )
+RETURN
+    contractPoints + tenurePoints + paymentPoints + fiberPoints
+        + supportPoints + securityPoints + seniorPoints
+
+// accounts table
+Risk Level =
+SWITCH (
+    TRUE (),
+    accounts[Risk Score] >= 9, "Very high",
+    accounts[Risk Score] >= 6, "High",
+    accounts[Risk Score] >= 3, "Medium",
+    "Low"
+)
+
+// accounts table: used to sort Risk Level (Column tools > Sort by column)
+Risk Level Order =
+SWITCH ( accounts[Risk Level], "Low", 1, "Medium", 2, "High", 3, "Very high", 4 )
+
+// services table: clearer label for charts
+Internet =
+IF ( services[internet_service] = "No", "No internet", services[internet_service] )
+
+
+// ---------------------------------------------------------------------
+// MEASURES (store them all in the accounts table)
+// ---------------------------------------------------------------------
+
+Customers = COUNTROWS ( accounts )
+
+Churned Customers = SUM ( accounts[churned] )
+
+Churn Rate = DIVIDE ( [Churned Customers], [Customers] )
+
+Active Customers = [Customers] - [Churned Customers]
+
+Avg Months Before Leaving =
+CALCULATE ( AVERAGE ( accounts[tenure_months] ), accounts[churned] = 1 )
+
+Monthly Revenue = SUM ( accounts[monthly_charges] )
+
+Monthly Revenue Lost =
+CALCULATE ( [Monthly Revenue], accounts[churned] = 1 )
+
+Revenue Lost % = DIVIDE ( [Monthly Revenue Lost], [Monthly Revenue] )
+
+Active Yearly Revenue =
+CALCULATE ( [Monthly Revenue], accounts[churned] = 0 ) * 12
+
+At-Risk Customers =
+CALCULATE (
+    [Customers],
+    accounts[churned] = 0,
+    accounts[Risk Level] IN { "High", "Very high" }
+)
+
+Yearly Revenue At Risk =
+CALCULATE (
+    [Monthly Revenue],
+    accounts[churned] = 0,
+    accounts[Risk Level] IN { "High", "Very high" }
+) * 12
+
+// Bar colour: brick for groups where 40% or more leave, grey for the rest
+Bar Colour = IF ( [Churn Rate] >= 0.4, "#B4432F", "#B3B8BF" )
+
+
+// ---------------------------------------------------------------------
+// WHAT-IF MEASURES
+// First create the parameter: Modeling > New parameter > Numeric range
+//   Name: Customers Moved   Min: 0   Max: 50   Increment: 5   Default: 20
+// Power BI then creates the table 'Customers Moved' and the measure
+// [Customers Moved Value] for you.
+// REMOVEFILTERS () keeps these numbers fixed when you click other visuals.
+// ---------------------------------------------------------------------
+
+MTM Customers =
+CALCULATE ( [Customers], REMOVEFILTERS (), accounts[contract] = "Month-to-month" )
+
+MTM Churn Rate =
+CALCULATE ( [Churn Rate], REMOVEFILTERS (), accounts[contract] = "Month-to-month" )
+
+One Year Churn Rate =
+CALCULATE ( [Churn Rate], REMOVEFILTERS (), accounts[contract] = "One year" )
+
+MTM Avg Monthly Bill =
+CALCULATE (
+    AVERAGE ( accounts[monthly_charges] ),
+    REMOVEFILTERS (),
+    accounts[contract] = "Month-to-month"
+)
+
+Customers Kept =
+[MTM Customers] * [Customers Moved Value] / 100
+    * ( [MTM Churn Rate] - [One Year Churn Rate] )
+
+Revenue Saved Per Year = [Customers Kept] * [MTM Avg Monthly Bill] * 12

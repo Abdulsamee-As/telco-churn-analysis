@@ -145,6 +145,29 @@ python 3_run_analysis.py
 | `data/clean/` | the 3 clean tables as CSV (used for the Power BI dashboard) |
 | `churn.db` | the SQLite database |
 
-## Next
+## Power BI dashboard
 
-A Power BI dashboard built on `data/clean/`.
+A two page report built on `data/clean/`, in [`powerbi/`](powerbi/).
+
+![Dashboard page 1](powerbi/dashboard_page1.png)
+
+**Page 1, Who leaves:** the headline KPIs, then churn rate by contract, tenure,
+payment method and internet service. Any group churning at 40% or more is coloured
+brick red by a DAX measure, so the colour follows the data.
+
+**Page 2, Revenue at risk:** the risk tiers tested against outcomes (2.4% churn at
+Low, 62.8% at Very high), the save list of 1,766 active high risk customers worth
+$1.57M a year, and a what if slider for moving month to month customers onto yearly
+contracts (20% moved = 244 kept, $194k saved a year).
+
+The risk score from [`views/customer_risk.sql`](views/customer_risk.sql) is rebuilt
+as a DAX calculated column and returns identical tier counts. Every KPI matches
+`results/*.csv`.
+
+| File | What it is |
+|---|---|
+| `Telco_Churn_Dashboard.pbix` | the report |
+| `measures.dax` | reference DAX for the measures and calculated columns |
+| `churn_theme.json` | the report theme |
+| `background_page1_1280x720.png`, `background_page2_1280x720.png` | page backgrounds |
+| `dashboard_page1.png` | screenshot used above |
